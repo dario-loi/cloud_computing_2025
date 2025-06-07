@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emotion Classifier</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Loading spinner animation */
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .spinner {
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 text-gray-800 transition-colors duration-300">
+
+    <div class="min-h-screen flex items-center justify-center p-4">
+        <main class="w-full max-w-2xl mx-auto">
+            <div class="bg-white rounded-2xl shadow-xl p-6 md:p-10">
+
+                <div class="text-center mb-8">
+                    <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Emotion Analysis 🤖</h1>
+                    <p class="text-gray-500 mt-2">Enter a sentence to discover its emotional tone.</p>
+                </div>
+
+                <form id="emotion-form">
+                    <div class="flex flex-col md:flex-row gap-3">
+                        <textarea id="sentence-input" placeholder="e.g., I am so happy!" required rows="1"
+                            class="flex-grow w-full px-4 py-3 rounded-lg border border-gray-300 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow resize-none overflow-hidden"></textarea>
+                        <button type="submit" id="submit-button"
+                            class="inline-flex items-center justify-center px-6 py-3 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-transform transform hover:scale-105">
+                            <span id="button-text">Analyze</span>
+                            <div id="loading-spinner"
+                                class="spinner w-5 h-5 rounded-full border-2 border-white border-t-transparent ml-2 hidden">
+                            </div>
+                        </button>
+                    </div>
+                </form>
+
+                <div id="results-container" class="mt-8 opacity-0 transition-opacity duration-500">
+                    <div id="predicted-emotion" class="text-center p-6 rounded-xl bg-gray-100">
+                        <span id="emotion-icon" class="text-7xl"></span>
+                        <p class="text-2xl font-bold mt-3 capitalize" id="emotion-label"></p>
+                        <p class="text-lg text-gray-600" id="confidence-score"></p>
+                    </div>
+
+                    <div class="mt-8">
+                        <h3 class="text-lg font-semibold text-center mb-4 text-gray-700">Emotion Distribution</h3>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <canvas id="emotion-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div id="error-message" class="mt-6 text-center text-red-500 font-medium hidden"></div>
+            </div>
+
+            <footer class="text-center mt-6 text-sm text-gray-500">
+                <p>Powered by AWS Lambda & ONNX Runtime</p>
+            </footer>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const LAMBDA_ENDPOINT = 'https://yanlufpsad.execute-api.us-east-1.amazonaws.com/sentimentAnalysisONNX';
+
+            // --- DOM Elements ---
+            const form = document.getElementById('emotion-form');
+            const sentenceInput = document.getElementById('sentence-input');
+            const submitButton = document.getElementById('submit-button');
+            const buttonText = document.getElementById('button-text');
+            const loadingSpinner = document.getElementById('loading-spinner');
+            const resultsContainer = document.getElementById('results-container');
+            const emotionIcon = document.getElementById('emotion-icon');
+            const emotionLabel = document.getElementById('emotion-label');
+            const confidenceScore = document.getElementById('confidence-score');
+            const errorMessage = document.getElementById('error-message');
+
+            // --- Chart.js Instance ---
+            let emotionChart = null;
+
+            // --- Emoji Mapping ---
+            const emotionEmojis = {
+                happy: '😄',
+                sad: '😢',
+                angry: '😠',
+                others: '😐'
+            };
+
+            // --- Auto-resizing textarea ---
+            sentenceInput.addEventListener('input', () => {
+                sentenceInput.style.height = 'auto';
+                sentenceInput.style.height = (sentenceInput.scrollHeight) + 'px';
+            });
+
+            // --- Form Submission Logic ---
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const sentence = sentenceInput.value.trim();
+                if (!sentence) return;
+
+                setLoading(true);
+                hideError();
+                resultsContainer.style.opacity = '0';
+
+                try {
+                    const response = await fetch(LAMBDA_ENDPOINT, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ sentence: sentence })
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json().catch(() => ({ error: 'An unknown error occurred.' }));
+                        throw new Error(errorData.details || `Request failed with status ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    displayResults(data);
+
+                } catch (error) {
+                    console.error('API Call Failed:', error);
+                    showError(`Error: ${error.message}`);
+                } finally {
+                    setLoading(false);
+                }
+            });
+
+            // --- UI Update Functions ---
+            const setLoading = (isLoading) => {
+                submitButton.disabled = isLoading;
+                buttonText.style.display = isLoading ? 'none' : 'inline';
+                loadingSpinner.style.display = isLoading ? 'inline-block' : 'none';
+            };
+
+            const showError = (message) => {
+                errorMessage.textContent = message;
+                errorMessage.classList.remove('hidden');
+            };
+
+            const hideError = () => {
+                errorMessage.classList.add('hidden');
+            };
+
+            const displayResults = (data) => {
+                const { predicted_label, confidence_score, details } = data;
+
+                emotionIcon.textContent = emotionEmojis[predicted_label] || '🤔';
+                emotionLabel.textContent = predicted_label;
+                confidenceScore.textContent = `Confidence: ${(confidence_score * 100).toFixed(1)}%`;
+
+                const allowedEmotions = ['happy', 'sad', 'angry', 'others'];
+                const filteredDetails = {};
+                for (const emotion of allowedEmotions) {
+                    if (details.hasOwnProperty(emotion)) {
+                        filteredDetails[emotion] = details[emotion];
+                    }
+                }
+
+                resultsContainer.style.opacity = '1';
+                renderChart(filteredDetails);
+            };
+
+            // --- Simplified Chart Rendering for Light Mode ---
+            const renderChart = (distributionData) => {
+                const ctx = document.getElementById('emotion-chart').getContext('2d');
+                const labels = Object.keys(distributionData);
+                const data = Object.values(distributionData);
+
+                const gridColor = 'rgba(0, 0, 0, 0.1)';
+                const labelColor = '#1f2937';
+
+                if (emotionChart) {
+                    emotionChart.data.labels = labels;
+                    emotionChart.data.datasets[0].data = data;
+                    emotionChart.update();
+                } else {
+                    emotionChart = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Emotion Score',
+                                data: data,
+                                backgroundColor: [
+                                    'rgba(54, 162, 235, 0.5)',
+                                    'rgba(255, 99, 132, 0.5)',
+                                    'rgba(255, 206, 86, 0.5)',
+                                    'rgba(153, 102, 255, 0.5)'
+                                ],
+                                borderColor: [
+                                    'rgba(54, 162, 235, 1)',
+                                    'rgba(255, 99, 132, 1)',
+                                    'rgba(255, 206, 86, 1)',
+                                    'rgba(153, 102, 255, 1)'
+                                ],
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            indexAxis: 'y',
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                x: {
+                                    beginAtZero: true,
+                                    max: 1,
+                                    grid: { color: gridColor },
+                                    ticks: { color: labelColor }
+                                },
+                                y: {
+                                    grid: { color: gridColor },
+                                    ticks: { color: labelColor, font: { size: 14 } }
+                                }
+                            },
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function (context) {
+                                            let label = context.dataset.label || '';
+                                            if (label) { label += ': '; }
+                                            if (context.parsed.x !== null) {
+                                                label += (context.parsed.x * 100).toFixed(1) + '%';
+                                            }
+                                            return label;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            };
+        });
+    </script>
+
+</body>
+
+</html>
