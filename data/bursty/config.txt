@@ -1,0 +1,6 @@
+Bursty test:
+
+Users: 3
+Ramp up time: 1s/user
+Test duration: 2m
+Request delay: [5, 10]s

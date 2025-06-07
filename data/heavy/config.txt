@@ -1,0 +1,6 @@
+Heavy test:
+
+Users: 100
+Ramp up time: 2s/user
+Test duration: 1m
+Request delay: [1, 3]s

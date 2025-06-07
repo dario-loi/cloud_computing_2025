@@ -1,0 +1,5 @@
+Manually reported cloudwatch metrics:
+
+MAX concurrent executions: 3
+Success rate 100%
+NO alarms raised

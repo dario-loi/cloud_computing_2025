@@ -1,0 +1,6 @@
+Medium test:
+
+Users: 50
+Ramp up time: 2s/user
+Test duration: 2m
+Request delay: [3, 5]s
