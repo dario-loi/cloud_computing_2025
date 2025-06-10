@@ -1,6 +1,6 @@
 Medium test:
 
 Users: 50
-Ramp up time: 2s/user
+Ramp up time: 2 user/s
 Test duration: 2m
 Request delay: [3, 5]s

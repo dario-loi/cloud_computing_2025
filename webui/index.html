@@ -18,7 +18,6 @@
             font-family: 'Inter', sans-serif;
         }
 
-        /* Loading spinner animation */
         @keyframes spin {
             to {
                 transform: rotate(360deg);
@@ -84,7 +83,6 @@
         document.addEventListener('DOMContentLoaded', () => {
             const LAMBDA_ENDPOINT = 'https://yanlufpsad.execute-api.us-east-1.amazonaws.com/sentimentAnalysisONNX';
 
-            // --- DOM Elements ---
             const form = document.getElementById('emotion-form');
             const sentenceInput = document.getElementById('sentence-input');
             const submitButton = document.getElementById('submit-button');
@@ -96,10 +94,8 @@
             const confidenceScore = document.getElementById('confidence-score');
             const errorMessage = document.getElementById('error-message');
 
-            // --- Chart.js Instance ---
             let emotionChart = null;
 
-            // --- Emoji Mapping ---
             const emotionEmojis = {
                 happy: '😄',
                 sad: '😢',
@@ -107,13 +103,11 @@
                 others: '😐'
             };
 
-            // --- Auto-resizing textarea ---
             sentenceInput.addEventListener('input', () => {
                 sentenceInput.style.height = 'auto';
                 sentenceInput.style.height = (sentenceInput.scrollHeight) + 'px';
             });
 
-            // --- Form Submission Logic ---
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const sentence = sentenceInput.value.trim();
@@ -146,7 +140,6 @@
                 }
             });
 
-            // --- UI Update Functions ---
             const setLoading = (isLoading) => {
                 submitButton.disabled = isLoading;
                 buttonText.style.display = isLoading ? 'none' : 'inline';
@@ -181,7 +174,6 @@
                 renderChart(filteredDetails);
             };
 
-            // --- Simplified Chart Rendering for Light Mode ---
             const renderChart = (distributionData) => {
                 const ctx = document.getElementById('emotion-chart').getContext('2d');
                 const labels = Object.keys(distributionData);
